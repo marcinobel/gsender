@@ -2,6 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## HARD RULE – this is a private fork, never contribute upstream
+
+This checkout is a **personal fork** (`marcinobel/gsender`) of `Sienci-Labs/gsender`. Work here is **never** sent back to the original project. There is no intent to upstream anything, ever.
+
+**Forbidden – do not do these, and do not offer or suggest them:**
+
+- Opening, drafting, or preparing a pull request against `Sienci-Labs/gsender` (or any repo other than `marcinobel/gsender`) – `gh pr create`, `gh pr edit`, the GitHub web flow, or a patch/branch prepared "in case we upstream it".
+- Pushing any branch, tag, or commit to a remote other than `origin` (`https://github.com/marcinobel/gsender.git`) – `git push <other-remote>`, `git push <url>`, `git push --mirror`, or pushing to a fork of the fork.
+- Adding, renaming, or repointing a remote so it targets `Sienci-Labs/*` (`git remote add upstream …`, `git remote set-url …`). **Only `origin` may exist**, and only pointing at `marcinobel/gsender`.
+- Filing issues, discussions, comments, or reviews on `Sienci-Labs/gsender`.
+- Any other outbound action that puts code, diffs, or bug reports from this repo in front of the upstream project.
+
+**Allowed:** everything local, plus `git push origin <branch>` and PRs *within* `marcinobel/gsender` (e.g. feature branch → `master`).
+
+**Read-only exception:** `git fetch` from upstream, or reading upstream code/issues/releases to compare or rebase, is fine. Pulling **in** is fine; pushing **out** is not.
+
+**Enforced mechanically:** `.claude/settings.json` registers a `PreToolUse` hook on `Bash` that runs `.claude/hooks/block-upstream-contributions.sh`, which denies the commands above before they run. Do not disable, bypass, or edit that hook to widen what it allows.
+
+If a task appears to require any forbidden action, stop and ask – do not improvise a workaround. Rules elsewhere in this file (Conventional Commits, CI branch names, release notes) describe upstream's own workflow and are kept for consistency; they never authorise contributing back.
+
 ## What this is
 
 gSender is a desktop G-code sender for GRBL and grblHAL CNC machines (Sienci Labs, GPLv3). It is **three programs in one repo** that talk to each other over HTTP + socket.io:

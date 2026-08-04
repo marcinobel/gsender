@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-/Users/marcinobel/Projects/gsender}/.claude/hooks/block-upstream-contributions.sh\"",
+            "timeout": 10,
+            "statusMessage": "Checking fork-isolation rules"
+          }
+        ]
+      }
+    ]
+  }
+}
