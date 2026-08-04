@@ -112,6 +112,13 @@ You can both run gSender locally using the public code-base as well as compile i
 <details>
 <summary>Expand to see all version notes</summary>
 
+### 1.6.4 (Unreleased)
+- Removed probe corner selection — probing no longer asks which corner you are working from.
+- Setting the manual tool change position and the TLS location can now be updated repeatedly without navigating away and back.
+- Expanded anonymous usage analytics to cover jogging, macros, coolant, console, rotary, spindle and laser actions. The existing consent prompt still governs all of it, and opting out stops collection entirely.
+- The "ATC unavailable" message is now readable in dark mode.
+- Fixed the Flexible Re-zero tool change wizard never sending its probe G-code — Probe Initial Tool, Probe Changed Tool and Resume Cutting sat on "Running..." forever with the machine idle.
+
 ### 1.6.3 (July 23, 2026)
 - Added LongMill MK3 profiles.
 - Added flashing path for new SLB-Lite using `$UF2`.

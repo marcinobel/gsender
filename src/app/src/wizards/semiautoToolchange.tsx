@@ -20,7 +20,6 @@
  * of Sienci Labs Inc. in Waterloo, Ontario, Canada.
  *
  */
-import controller from 'app/lib/controller';
 import {
     getProbeSettings,
     getUnitModal,
@@ -72,19 +71,17 @@ const probeInitialToolStep = [
                 actions: [
                     {
                         label: 'Probe Initial Tool',
-                        cb: () => {
-                            controller.command('gcode', [
-                                'G91 G21',
-                                'G38.2 Z-[global.toolchange.PROBE_DISTANCE] F[global.toolchange.PROBE_FEEDRATE]',
-                                'G0 Z[global.toolchange.RETRACT]',
-                                'G38.2 Z-15 F[global.toolchange.PROBE_SLOW_FEEDRATE]',
-                                'G4 P0.3',
-                                '%global.toolchange.TOOL_OFFSET=posz',
-                                '(TLO set: [global.toolchange.TOOL_OFFSET])',
-                                'G91 G21 G0 Z10',
-                                'G90',
-                            ]);
-                        },
+                        gcodeLines: [
+                            'G91 G21',
+                            'G38.2 Z-[global.toolchange.PROBE_DISTANCE] F[global.toolchange.PROBE_FEEDRATE]',
+                            'G0 Z[global.toolchange.RETRACT]',
+                            'G38.2 Z-15 F[global.toolchange.PROBE_SLOW_FEEDRATE]',
+                            'G4 P0.3',
+                            '%global.toolchange.TOOL_OFFSET=posz',
+                            '(TLO set: [global.toolchange.TOOL_OFFSET])',
+                            'G91 G21 G0 Z10',
+                            'G90',
+                        ],
                     },
                 ],
             },
@@ -93,6 +90,10 @@ const probeInitialToolStep = [
 ];
 
 const createWizard = (count: number) => {
+    // Resolved once per tool change rather than per click: getUnitModal() reads
+    // $13, a controller setting that does not change while a job is running.
+    const unitModal = getUnitModal();
+
     return {
         intro: {
             icon: 'fas fa-caution',
@@ -176,19 +177,16 @@ const createWizard = (count: number) => {
                         actions: [
                             {
                                 label: 'Probe Changed Tool',
-                                cb: () => {
-                                    const modal = getUnitModal();
-                                    controller.command('gcode', [
-                                        'G91 G21',
-                                        'G38.2 Z-[global.toolchange.PROBE_DISTANCE] F[global.toolchange.PROBE_FEEDRATE]',
-                                        'G0 Z[global.toolchange.RETRACT]',
-                                        'G38.2 Z-15 F[global.toolchange.PROBE_SLOW_FEEDRATE]',
-                                        '(Set Z to Tool offset and wait)',
-                                        'G4 P0.3',
-                                        `${modal} G10 L20 P0 Z[global.toolchange.TOOL_OFFSET]`,
-                                        'G0 Z[global.toolchange.RETRACT]',
-                                    ]);
-                                },
+                                gcodeLines: [
+                                    'G91 G21',
+                                    'G38.2 Z-[global.toolchange.PROBE_DISTANCE] F[global.toolchange.PROBE_FEEDRATE]',
+                                    'G0 Z[global.toolchange.RETRACT]',
+                                    'G38.2 Z-15 F[global.toolchange.PROBE_SLOW_FEEDRATE]',
+                                    '(Set Z to Tool offset and wait)',
+                                    'G4 P0.3',
+                                    `${unitModal} G10 L20 P0 Z[global.toolchange.TOOL_OFFSET]`,
+                                    'G0 Z[global.toolchange.RETRACT]',
+                                ],
                             },
                         ],
                     },
@@ -205,18 +203,15 @@ const createWizard = (count: number) => {
                         actions: [
                             {
                                 label: 'Resume Cutting',
-                                cb: () => {
-                                    const unit = getUnitModal();
-                                    controller.command('gcode', [
-                                        '(Returning to initial position)',
-                                        'G21 G91 Z10',
-                                        `G90 ${unit} G0 X[global.toolchange.XPOS] Y[global.toolchange.YPOS]`,
-                                        `G90 ${unit} G0 Z[global.toolchange.ZPOS]`,
-                                        '(Restore initial modals)',
-                                        'M3 [global.toolchange.UNITS] [global.toolchange.DISTANCE] [global.toolchange.FEEDRATE]',
-                                        '%toolchange_complete',
-                                    ]);
-                                },
+                                gcodeLines: [
+                                    '(Returning to initial position)',
+                                    'G21 G91 Z10',
+                                    `G90 ${unitModal} G0 X[global.toolchange.XPOS] Y[global.toolchange.YPOS]`,
+                                    `G90 ${unitModal} G0 Z[global.toolchange.ZPOS]`,
+                                    '(Restore initial modals)',
+                                    'M3 [global.toolchange.UNITS] [global.toolchange.DISTANCE] [global.toolchange.FEEDRATE]',
+                                    '%toolchange_complete',
+                                ],
                             },
                         ],
                     },

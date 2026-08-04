@@ -1,56 +1,64 @@
-# Frontend Unit Testing
+# Frontend unit testing
 
-This document is the in-repo quick reference for frontend unit tests in `gSender`.
-Use it for day-to-day work; keep it short and aligned with the current codebase.
+This document is the in-repo quick reference for frontend unit tests in `gSender`. Use it for day-to-day work; keep it short and aligned with the current codebase.
+
+For the hardware-driven end-to-end suite, see `cypress/TESTING.md`.
 
 ## Scope
 
 - Frontend unit/component tests run with `jest` + `@testing-library/react`.
-- Existing config is defined at:
+- One Jest project covers the whole repo – it picks up the server-side suite under `src/server/lib/__tests__/` as well as the renderer tests.
+- Config lives at:
   - `jest.config.js`
   - `jest.setup.js`
   - `src/app/jest.setup.cjs`
 
-## Run Tests
+## Run tests
 
 From the repository root:
 
-- Run all unit tests once:
-  - `npm run test:unit`
-- Run in watch mode:
-  - `npm run test:unit:watch`
-- Run a single test file:
-  - `npx jest __tests__/Button.test.tsx`
+- Run all unit tests once: `npm test` (or `npm run test:unit`)
+- Run in watch mode: `npm run test:unit:watch`
+- Run a single test file: `npx jest src/app/src/components/Button/Button.test.tsx`
+- Run a single test by name: `npx jest -t "renders the label"`
+- Filter by path fragment: `npx jest --testPathPatterns=Button`
 
-## Test Location and Naming
+Note the plural – Jest 30 renamed `--testPathPattern` to `--testPathPatterns`.
 
-- Put tests in either:
-  - `__tests__/...`
-  - `*.test.tsx` or `*.test.ts`
-- Keep tests close to their feature when practical, or use `__tests__` for shared/component-level tests.
-- Prefer one test file per component/hook/module under test.
+**`yarn test:app` does not work on macOS or Linux.** The script in `src/app/package.json` invokes `../../node_modules/.bin/jest.cmd`, which only exists on Windows; elsewhere it fails with `No such file or directory`. Use the root-level commands above instead.
 
-## Current Conventions
+Jest prints a `jest-haste-map: Haste module naming collision: gSender` warning on every run, because `package.json` and the generated `src/package.json` share a name. It is harmless.
+
+## Test location and naming
+
+Both layouts are picked up by `testMatch`:
+
+- `__tests__/...`
+- `*.test.ts` / `*.test.tsx` / `*.test.js` / `*.test.jsx`
+
+In practice the codebase keeps tests next to what they cover – `src/app/src/features/<Feature>/tests/`, or beside the component as with `src/app/src/components/Button/Button.test.tsx`. Prefer one test file per component/hook/module under test.
+
+## Current conventions
 
 - Prefer React Testing Library queries (`getByRole`, `getByText`, etc.) over implementation details.
-- Test behavior, not internal state.
+- Test behaviour, not internal state.
 - Keep tests deterministic and isolated (no shared mutable state across tests).
 - Mock external dependencies that are not part of the unit being tested.
 
-## Helpers and Environment Notes
+## Helpers and environment notes
 
-- `@testing-library/jest-dom` is enabled globally via setup files.
+- `@testing-library/jest-dom` is enabled globally via the setup files.
 - `TextEncoder` and `TextDecoder` are polyfilled in `jest.setup.js`.
-- Asset/style imports are mapped through Jest module mappers.
-- `app/*` import aliases are supported in tests via `moduleNameMapper`.
+- Asset and style imports are mapped through `moduleNameMapper`, as are `react-markdown`, `react-syntax-highlighter`, `react-icons` and `@react-pdf/renderer` – see `src/app/src/__mocks__/`.
+- The `app/*`, `@/*` and `app-root/*` import aliases work in tests via `moduleNameMapper`. If you add an alias, add it in `jest.config.js`, `src/app/tsconfig.json` and `src/app/vite.config.js` – all three.
 
-## Mocking Guidance
+## Mocking guidance
 
-- Mock app-level modules when needed with `jest.mock(...)`.
-- For complex mocks, prefer dedicated mock files near the test or inside `__mocks__/`.
-- Keep mocks minimal: only mock behavior required by the test case.
+- Mock app-level modules with `jest.mock(...)`.
+- For complex mocks, prefer a dedicated file near the test or inside `__mocks__/`.
+- Keep mocks minimal: only mock the behaviour the test case requires.
 
-## What to Cover in New Tests
+## What to cover in new tests
 
 - Rendering for primary and edge states.
 - User interactions (click, type, keyboard where relevant).
@@ -59,7 +67,7 @@ From the repository root:
 
 ## Examples
 
-Use these as starting templates and adapt naming/paths to your feature.
+Use these as starting templates and adapt naming and paths to your feature.
 
 ### 1) Component render + interaction
 
@@ -81,49 +89,56 @@ test('calls onClick when pressed', async () => {
 
 ### 2) Hook test with a mocked dependency
 
-```ts
-import { renderHook } from '@testing-library/react';
-import useGetDataCollectionStatus from 'app/hooks/useGetDataCollectionStatus';
-import useTypedSelector from 'app/hooks/useTypedSelector';
-
-jest.mock('app/hooks/useTypedSelector', () => ({
-    __esModule: true,
-    default: jest.fn(),
-}));
-
-test('returns data collection status from store', () => {
-    (useTypedSelector as jest.Mock).mockImplementation((selectorFn) =>
-        selectorFn({ settings: { dataCollection: { enabled: true } } }),
-    );
-
-    const { result } = renderHook(() => useGetDataCollectionStatus());
-    expect(result.current).toBe(true);
-});
-```
-
-### 3) Module mock pattern for app services
+Hooks in `app/hooks` are named exports, so mock them as such.
 
 ```ts
-import { myAction } from 'app/store/actions/myAction';
-import api from 'app/lib/api';
+import { renderHook, waitFor } from '@testing-library/react';
+import { useGetCollectDataStatus } from 'app/hooks/useGetDataCollectionStatus';
+import api from 'app/api';
 
-jest.mock('app/lib/api', () => ({
+jest.mock('app/api', () => ({
     __esModule: true,
     default: {
-        post: jest.fn(),
+        metrics: { getCollectDataStatus: jest.fn() },
     },
 }));
 
-test('calls api with expected payload', async () => {
-    (api.post as jest.Mock).mockResolvedValue({ ok: true });
+test('returns the collect-data status from the API', async () => {
+    (api.metrics.getCollectDataStatus as jest.Mock).mockResolvedValue({
+        data: { collectUserDataStatus: 'ACCEPTED' },
+    });
 
-    await myAction({ id: 'abc' });
-    expect(api.post).toHaveBeenCalledWith('/endpoint', { id: 'abc' });
+    const { result } = renderHook(() => useGetCollectDataStatus());
+    await waitFor(() => expect(result.current[0]).toBe('ACCEPTED'));
 });
 ```
 
-## Extended Reference
+### 3) Isolating the socket layer
 
-For the full workflow and deeper rationale, see:
+Most feature code reaches the machine through the `app/lib/controller` singleton. Mock it rather than standing up a socket.
 
-- [gSender Frontend Unit Testing Workflow (Notion)](https://www.notion.so/walids-space/gSender-Frontend-Unit-Testing-Workflow-Full-Guide-314b85710878803ca066cc444b9a502b?source=copy_link)
+```ts
+import controller from 'app/lib/controller';
+
+jest.mock('app/lib/controller', () => ({
+    __esModule: true,
+    default: {
+        command: jest.fn(),
+        writeln: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+    },
+}));
+
+test('sends the probe G-code', () => {
+    runProbe();
+    expect(controller.command).toHaveBeenCalledWith(
+        'gcode',
+        expect.arrayContaining(['G91 G21']),
+    );
+});
+```
+
+## A note on types
+
+There is currently no working type check in this repo – `npm run check-types` points at a path with no tsconfig, and the only TypeScript installed is a transitive 3.9.10 that cannot parse this config. Vite and esbuild strip types without validating them, so **tests are the main automated safety net for renderer code.** Assertions that would be caught by a compiler in another project have to be caught here instead.

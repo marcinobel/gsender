@@ -1,0 +1,95 @@
+# Running a source build
+
+Running Electron from this checkout is **not** the same as running the packaged app, and the two ways
+of getting it wrong both fail **without any error message**. Verified against 1.6.4 on macOS,
+2026-08-04.
+
+## Build
+
+```sh
+npm run build-prod          # needs yarn on PATH; ~2 min
+```
+
+`bun install` works for dependencies if you prefer it (2277 packages, ~1.7 GB) – but note
+[CLAUDE.md](../CLAUDE.md): CI runs yarn, and `bun.lock` is committed without being what CI uses.
+
+## Launching it – two silent traps
+
+| Invocation | What happens |
+|---|---|
+| `electron .` | the root `package.json` says `main: ./dist/gsender/server-cli` – the **headless server**. It starts, and there is no window and no error |
+| `electron dist/gsender/main.js` | right entry point, but handing Electron a **`.js` file** means it never reads a `package.json`, so the app name stays `Electron` and its state goes to `~/Library/Application Support/Electron/`. gSender boots with **factory defaults** – no `toolChangeOption`, no probe settings, no shortcuts |
+| `electron dist/gsender` **← correct** | reads `dist/gsender/package.json`, which names the app `gSender`, so state resolves to the shared `Application Support/gSender` folder |
+
+The packaged app never hits either trap because `dist/gsender/package.json` carries the right `name`
+but **no `main` field** – electron-builder injects that at packaging time via
+`build.extraMetadata.main` (`package.json`, `"extraMetadata": {"main": "./main.js"}`). A launcher
+script that runs a source build has to write the `main` field itself, and re-apply it after every
+rebuild, because `dist/` is a build artifact.
+
+The second trap is worth understanding rather than just avoiding, because it silently produces a
+*working-looking* app with none of your settings. See the next section for why.
+
+## Where settings actually live
+
+**Almost everything configured through gSender's UI lives in the Electron app state, not in the RC
+file.** `--config` loading correctly is no evidence that your settings loaded – the app can start
+with the right macros, ports and watch directory while every preference is at factory default.
+
+| Store | Path | Contents | Relocatable |
+|---|---|---|---|
+| ConfigStore | `~/.sender_rc` | macros, ports, baud rates, maintenance reminders | **Yes** – `--config` |
+| App state | `~/Library/Application Support/gSender/gsender-<ver>.json` | workspace, probe settings, tool-change strategy, shortcuts, gamepad profiles | **No** – see below |
+| Sessions | `~/.sienci-sessions/` | auth tokens | no flag found |
+
+The RC filename is chosen at runtime: `.sender_rc` for stable builds, `.edge_rc` for EDGE builds.
+
+### `--user-data-dir` cannot relocate the app state
+
+Electron normally honours the Chromium switch `--user-data-dir`. gSender parses its own `argv` with
+**commander** (`src/server-cli.js:28`, `program.parse(normalizedArgv)` at line 98), which rejects
+unrecognised options, so the switch never reaches Electron and the app exits:
+
+```
+error: unknown option '--user-data-dir=…'
+```
+
+Tested both via `open -a gSender --args` and by invoking the binary directly. Note that `open` fails
+**silently** in this case – it returns success and no process appears; the error is visible only when
+running the binary directly.
+
+The supported workaround is to snapshot instead: Config screen → **gSender Preferences → Export**
+writes a settings JSON covering shortcuts, gamepad profiles, start/stop code and probe settings, with
+a matching Import.
+
+## Command-line options
+
+Defined in `src/server-cli.js:76-90`:
+
+```
+-p, --port <port>                 Set listen port
+-H, --host <host>                 Set listen address or hostname
+-b, --backlog <backlog>           Set listen backlog
+-c, --config <filename>           Set config file (default: ~/.cncrc)
+-v, --verbose                     Increase verbosity (-v, -vv, -vvv)
+-m, --mount <route-path>:<target> Add a mount point for serving static files
+-w, --watch-directory <path>      Watch a directory for changes
+    --access-token-lifetime <t>   Access token lifetime (default: 30d)
+    --allow-remote-access         Allow remote access to the server
+    --remote                      Headless mode, expose server on the local network
+    --controller <type>           Grbl | grblHAL
+    --kiosk                       Kiosk mode
+```
+
+Defaults differ under Electron: host `127.0.0.1` and an ephemeral port, against `0.0.0.0:8000`
+standalone (`src/server-cli.js:73-74`).
+
+> **`--controller grblHAL` is silently ignored** – it is accepted and then discarded, leaving
+> auto-detection on. Only `--controller Grbl` actually forces anything. See
+> [known-issues.md](known-issues.md#10-the-grblhal-controller-flag-is-silently-discarded).
+
+## Stopping it
+
+Use `kill -TERM`, not a hard kill, and confirm the serial port is released. A shutdown that does not
+let the port close cleanly is suspected – not proven – in the CH340 wedge described in
+[known-issues.md](known-issues.md).
