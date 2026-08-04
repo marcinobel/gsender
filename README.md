@@ -118,6 +118,10 @@ You can both run gSender locally using the public code-base as well as compile i
 - Expanded anonymous usage analytics to cover jogging, macros, coolant, console, rotary, spindle and laser actions. The existing consent prompt still governs all of it, and opting out stops collection entirely.
 - The "ATC unavailable" message is now readable in dark mode.
 - Fixed the Flexible Re-zero tool change wizard never sending its probe G-code — Probe Initial Tool, Probe Changed Tool and Resume Cutting sat on "Running..." forever with the machine idle.
+- Jobs on grbl now wait for the machine to finish moving before reporting completion. gSender adds a planner drain to the end of every file it loads, and that line had stopped being recognised, so "job complete" could appear while the machine was still retracting and spinning down. On files that end with a long movement, completion is now announced later than it used to be; that delay is the machine actually finishing.
+- A `%wait` line in your own file is now recognised on both grbl and grblHAL, with or without a comment after it, and sending pauses there until queued motion has finished.
+- No change to end-of-job behaviour on grblHAL, which does not add a planner drain of its own.
+- Loading a file no longer logs a parse error for that drain line, and a `%` line containing nothing but a comment is no longer treated as an expression.
 
 ### 1.6.3 (July 23, 2026)
 - Added LongMill MK3 profiles.

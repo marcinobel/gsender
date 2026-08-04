@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This checkout is a **personal fork** (`marcinobel/gsender`) of `Sienci-Labs/gsender`. Work here is **never** sent back to the original project. There is no intent to upstream anything, ever.
 
-What the fork actually changes, and why it exists at all, is in **[FORK.md](FORK.md)** – read it before touching the tool-change wizards.
+What the fork actually changes, and why it exists at all, is in **[FORK.md](FORK.md)** – read it before touching the tool-change wizards or the controllers' `%`-line handling.
 
 **Forbidden – do not do these, and do not offer or suggest them:**
 
@@ -73,7 +73,7 @@ To launch a production build from this checkout it must be `electron dist/gsende
 - `npm run lint` – the `concurrently` invocation has a missing space between `--names "..."` and the first command, so eslint never runs. Use `npm run eslint` directly.
 - `yarn test:app` – invokes `../../node_modules/.bin/jest.cmd`, which exists only on Windows. Fails on macOS/Linux; use the root `npm test`.
 - The Cypress `report:*` and `*:open` scripts are `cmd.exe` syntax (`if exist`, `rmdir /s /q`, `start`) and are likewise Windows-only.
-- `npm run check-types` – points at `./src/app/src`, but the tsconfig lives at `./src/app`. Also, the only TypeScript in `node_modules` is a transitive **3.9.10**, which cannot parse this tsconfig (`moduleResolution: Bundler`, `noUncheckedIndexedAccess`, …). **There is no working typecheck in this repo** – Vite/esbuild strip types without checking them, so type errors surface only at runtime. Don't claim "types check out" without installing a modern TypeScript yourself. This is not hypothetical: the defect this fork patches was a wizard whose action objects were never typed against the `WizardAction` interface the renderer reads, so a shipped feature could not work at all. See [FORK.md](FORK.md).
+- `npm run check-types` – points at `./src/app/src`, but the tsconfig lives at `./src/app`. Also, the only TypeScript in `node_modules` is a transitive **3.9.10**, which cannot parse this tsconfig (`moduleResolution: Bundler`, `noUncheckedIndexedAccess`, …). **There is no working typecheck in this repo** – Vite/esbuild strip types without checking them, so type errors surface only at runtime. Don't claim "types check out" without installing a modern TypeScript yourself. This is not hypothetical: the first defect this fork patches was a wizard whose action objects were never typed against the `WizardAction` interface the renderer reads, so a shipped feature could not work at all. See [FORK.md](FORK.md).
 
 ## Architecture
 
@@ -124,13 +124,13 @@ Key server pieces in `src/server/lib/`:
 
 ## Testing
 
-- **Jest** (`jest.config.js`, jsdom): 8 suites covering `src/server/lib/__tests__/`, a few feature computations (Surfacing output, XY squaring, movement tuning) and component smoke tests. Fast (~2 s) – run it. Details and mocking patterns: `src/app/docs/testing.md`.
+- **Jest** (`jest.config.js`, jsdom): 11 suites / 97 tests (3 skipped) covering `src/server/lib/__tests__/`, both controllers (`src/server/controllers/*/__tests__/`, added by this fork – they construct a real controller against a fake connection and need the logger mocked), a few feature computations (Surfacing output, XY squaring, movement tuning) and component smoke tests. Fast – run it. Details and mocking patterns: `src/app/docs/testing.md`.
 - **Cypress** (`cypress/e2e/grbl/`, `cypress/e2e/grblHal/`): drives the real UI at `http://localhost:8000` and expects an actual connected machine for most specs, so it does not run in CI or in a normal dev loop. Note `specPattern` in `cypress.config.js` is pinned to a single grblHAL master spec – pass `--spec` to run anything else. Details: `cypress/TESTING.md`.
 
 ## Further documentation
 
-- `FORK.md` – why this fork exists, the one defect it patches, how the fix was verified on real hardware, and the rebase posture.
-- `fork/known-issues.md` – defects and behavioural traps verified in this codebase, including one genuine hazard (`Resume Cutting` restarts the spindle unconditionally) and the `%wait` planner-drain bug that makes "job complete" not mean "machine stopped".
+- `FORK.md` – why this fork exists, the two defects it patches, how each was verified (the wizard fix on real hardware, the `%wait` fix by tests only so far), and the rebase posture.
+- `fork/known-issues.md` – defects and behavioural traps verified in this codebase. Two are genuine hazards: `Resume Cutting` restarts the spindle unconditionally, and a `%` expression in a G-code file can execute arbitrary JavaScript. One entry – the `%wait` planner drain, which made "job complete" not mean "machine stopped" – is fixed on this fork.
 - `fork/running-from-source.md` – building, the two silent Electron entry-point traps, where settings actually live, and the CLI options.
 - `src/app/docs/testing.md` – frontend unit testing: how to run, where tests live, mocking the controller singleton and app hooks.
 - `src/app/docs/analytics.md` – PostHog wiring, the consent gate, and the convention for adding an event.
@@ -142,5 +142,6 @@ Key server pieces in `src/server/lib/`:
 - `jest-haste-map` warns about a naming collision between `package.json` and `src/package.json` (both named `gSender`). Harmless, expected output.
 - The generated `src/package.json` and `src/app/package.json` are committed but overwritten by `package-sync`; edit the root one.
 - `.env.dev` / `.env.prod` are loaded by `esbuild.config.js` (Sentry, PostHog). See `.env.example`.
-- **Wizard actions must be declared as `{ label, gcodeLines }`.** `features/Helper/components/Actions.tsx` reads `action.gcodeLines` and nothing ever invokes a `cb` callback – a wizard action declared with `cb` renders, clicks, and sends nothing, hanging on `Running…` for ever. This is exactly the bug this fork patches; the objects are not typed, so nothing warns you.
-- **Grbl and grblHAL have drifted apart in `gcode:load`.** The Grbl controller appends a `%wait` dwell to every program (`GrblController.js:1610`); the grblHAL one has that line commented out (`GrblHalController.js:1911`). The Grbl one has never worked – see `fork/known-issues.md`.
+- **Wizard actions must be declared as `{ label, gcodeLines }`.** `features/Helper/components/Actions.tsx` reads `action.gcodeLines` and nothing ever invokes a `cb` callback – a wizard action declared with `cb` renders, clicks, and sends nothing, hanging on `Running…` for ever. This is the first of the two bugs this fork patches; the objects are not typed, so nothing warns you.
+- **Never mutate `line` on the `%` path.** In both controllers' sender `dataFilter` a line starting with `%` is JavaScript, not G-code – `(…)` is a function call and `,` is a sequence operator – so the comment regexes would silently corrupt it. That is what the `if (line[0] !== "%")` guard exists for. Compare against the `%` tokens using `stripSemicolonComment(line)`, a throwaway copy, and hand the evaluator the original line.
+- **Grbl and grblHAL have drifted apart in `gcode:load`.** The Grbl controller appends a `%wait` dwell to every program (`GrblController.js:1630`); grblHAL appends none, deliberately (`GrblHalController.js:1922-1942` records why). The Grbl dwell was inert from `93a0e53fc` until this fork fixed it – see `fork/known-issues.md` item 2.
