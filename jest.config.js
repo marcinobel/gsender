@@ -19,6 +19,7 @@ module.exports = {
   'react-syntax-highlighter': '<rootDir>/src/app/src/__mocks__/reactSyntaxHighlighterMock.js',
   '^react-markdown$': '<rootDir>/src/app/src/__mocks__/reactMarkdownMock.js',
   '^app-root/(.*)$': '<rootDir>/$1',
+  '^server/(.*)$': '<rootDir>/src/server/$1',
 '^react-icons/(.*)$': '<rootDir>/src/app/src/__mocks__/reactIconsMock.js',
   '^@/(.*)$': '<rootDir>/src/app/src/$1' ,
   '^react$': '<rootDir>/node_modules/react',

@@ -42,6 +42,7 @@ import evaluateAssignmentExpression from "../../lib/evaluate-assignment-expressi
 import logger from "../../lib/logger";
 import translateExpression from "../../lib/translate-expression";
 import { extractRealtimeCommands } from "../../lib/extract-realtime-commands";
+import { stripSemicolonComment } from "../../lib/strip-semicolon-comment";
 import config from "../../services/configstore";
 import monitor from "../../services/monitor";
 import taskRunner from "../../services/taskrunner";
@@ -487,13 +488,29 @@ class GrblController {
 				const { sent, received } = this.sender.state;
 
 				if (line[0] === "%") {
+					// Compare against the % tokens on a throwaway copy with any `;`
+					// comment removed. `line` itself must stay untouched: in a %
+					// line the parentheses and commas are JavaScript, not G-code
+					// comments, and stripping them would silently corrupt the
+					// expression (see 93a0e53fc). The feeder has stripped `;`
+					// before the same comparison since 50e63eb54; this restores
+					// parity on the sender path.
+					// The other half of the %wait fix is the end-of-program dwell
+					// appended by the "gcode:load" handler below.
+					const token = stripSemicolonComment(line);
+
 					// %wait
-					if (line === WAIT) {
+					if (token === WAIT) {
 						log.debug(
 							`Wait for the planner to empty: line=${sent + 1}, sent=${sent}, received=${received}`,
 						);
 						this.sender.hold({ data: WAIT }); // Hold reason
 						return "G4 P0.5"; // dwell
+					}
+
+					// A `%` line carrying no expression (bare `%`, or `%` plus a comment)
+					if (token === "%") {
+						return "";
 					}
 
 					// Expression
@@ -1607,7 +1624,10 @@ class GrblController {
 				// respond with an ok when the dwell is complete. At that instant, there will
 				// be no queued motions, as long as no more commands were sent after the G4.
 				// This is the fastest way to do it without having to check the status reports.
-				const dwell = "%wait ; Wait for the planner to empty";
+				// The sender dataFilter also tolerates a commented `%wait`, so reverting this
+				// line alone does not disable the drain — `const dwell = "";` is the kill
+				// switch (Sender.load() drops blank lines, so line accounting is unaffected).
+				const dwell = WAIT;
 
 				// add delay to spindle startup if enabled
 				const preferences = store.get("preferences", {});
