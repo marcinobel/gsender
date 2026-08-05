@@ -282,7 +282,9 @@ const main = () => {
             };
             const options = {
                 ...bounds,
-                title: `gSender ${pkg.version}`,
+                // Fork marker, matching src/app/src/workspace/index.tsx. Covers the
+                // pre-mount title and the Dock-reactivate path. Display only.
+                title: `gSender ${pkg.version} (Marcin Obel)`,
                 kiosk,
             };
             const window = await windowManager.openWindow(url, options, splashScreen);

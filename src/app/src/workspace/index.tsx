@@ -58,7 +58,11 @@ const Workspace = () => {
             }, 100);
         }
 
-        document.title = `gSender ${pkg.version}`;
+        // Fork marker: identifies this as the marcinobel build, not stock gSender.
+        // Display only – the app identity (`productName`, `src/app/package.json` name)
+        // must stay "gSender", because it derives the userData path that holds all
+        // settings. See fork/running-from-source.md.
+        document.title = `gSender ${pkg.version} (Marcin Obel)`;
     }, [location]);
 
     useDarkMode();
