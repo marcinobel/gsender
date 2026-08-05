@@ -7,7 +7,7 @@ For the hardware-driven end-to-end suite, see `cypress/TESTING.md`.
 ## Scope
 
 - Frontend unit/component tests run with `jest` + `@testing-library/react`.
-- One Jest project covers the whole repo – it picks up the server-side suite under `src/server/lib/__tests__/` as well as the renderer tests.
+- One Jest project covers the whole repo – it picks up the server-side suites under `src/server/lib/__tests__/` and `src/server/controllers/*/__tests__/` as well as the renderer tests.
 - Config lives at:
   - `jest.config.js`
   - `jest.setup.js`
@@ -51,6 +51,7 @@ In practice the codebase keeps tests next to what they cover – `src/app/src/fe
 - `TextEncoder` and `TextDecoder` are polyfilled in `jest.setup.js`.
 - Asset and style imports are mapped through `moduleNameMapper`, as are `react-markdown`, `react-syntax-highlighter`, `react-icons` and `@react-pdf/renderer` – see `src/app/src/__mocks__/`.
 - The `app/*`, `@/*` and `app-root/*` import aliases work in tests via `moduleNameMapper`. If you add an alias, add it in `jest.config.js`, `src/app/tsconfig.json` and `src/app/vite.config.js` – all three.
+- `server/*` is mapped too, but only in `jest.config.js`: server code that imports `server/lib/...` is resolved by an esbuild plugin in production, so there is no tsconfig or vite counterpart to keep in sync.
 
 ## Mocking guidance
 

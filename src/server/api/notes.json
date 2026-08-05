@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.6.4",
+    "date": "Unreleased",
+    "notes": [
+      "Removed probe corner selection — probing no longer asks which corner you are working from.",
+      "Setting the manual tool change position and the TLS location can now be updated repeatedly without navigating away and back.",
+      "Expanded anonymous usage analytics to cover jogging, macros, coolant, console, rotary, spindle and laser actions. The existing consent prompt still governs all of it, and opting out stops collection entirely.",
+      "The \"ATC unavailable\" message is now readable in dark mode.",
+      "Fixed the Flexible Re-zero tool change wizard never sending its probe G-code — Probe Initial Tool, Probe Changed Tool and Resume Cutting sat on \"Running...\" forever with the machine idle.",
+      "Jobs on grbl now wait for the machine to finish moving before reporting completion. gSender adds a planner drain to the end of every file it loads, and that line had stopped being recognised, so \"job complete\" could appear while the machine was still retracting and spinning down. On files that end with a long movement, completion is now announced later than it used to be; that delay is the machine actually finishing.",
+      "A `%wait` line in your own file is now recognised on both grbl and grblHAL, with or without a comment after it, and sending pauses there until queued motion has finished.",
+      "No change to end-of-job behaviour on grblHAL, which does not add a planner drain of its own.",
+      "Loading a file no longer logs a parse error for that drain line, and a `%` line containing nothing but a comment is no longer treated as an expression."
+    ]
+  },
+  {
     "version": "1.6.3",
     "date": "July 23, 2026",
     "notes": [
@@ -56,33 +71,6 @@
       "Squaring and motor tuning workflows now share the same jog popover for a more consistent experience",
       "Spindle delay behaviour has been updated and is now an explicit configurable option for forced insertion when needed",
       "Macros can now send realtime commands"
-    ]
-  },
-  {
-    "version": "1.6.1",
-    "date": "April 30, 2026",
-    "notes": [
-      "Added option to skip first tool change on fixed strategy or prompt use if they want to skip",
-      "Added application scaling for larger monitors and devices - in accessibility section in Config",
-      "Rapid Position and Park buttons now properly enabled after homing on grbl devices",
-      "Spindle Delay config should now be reading $392 correctly on older firmware versions",
-      "Go To Flyout widget can now move in machine coordinates if homing enabled - check out the new MCS option",
-      "Go To Flyout widget now uses the same safe height logic as several other Go To functionalities",
-      "Machine defaults selector will prompt to apply where necessary",
-      "Macro keybinds should persist",
-      "Gamepad - Park shortcut works as expected",
-      "Gamepad - Rapid position shortcut calculation fixed to not use stale position data",
-      "Macro keybindings should persist again",
-      "Further tweaks to rotary time estimation",
-      "Fixed issue where tool table was assumed to exist on PRB: output which is not the case for some grblHAL compilations",
-      "Laser test now calculates max values using $30 (grbl) or $730 (grblHAL) instead of depending on local state",
-      "Added application icon for IOS devices",
-      "Added Config option to let user toggle probe type selection directly in Probe drawer",
-      "Updates to Automations editor to include variables dropdown and general UX improvements",
-      "Config option - now possible to disable power saving on Electron to allow screen blanking",
-      "Lite mode toggle feather should be more obvious when it’s enabled or disabled",
-      "Macros again show on remote mode",
-      "Updates to 3d Probe text instructions to be more relevant to that probe type"
     ]
   }
 ]

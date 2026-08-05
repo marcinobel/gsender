@@ -55,6 +55,12 @@ const posthog = usePostHog();
 posthog?.capture('job_started', { active_state: currentActiveState });
 ```
 
+**Two import paths for that hook are in use.** `@posthog/react` is the package the provider itself comes from (`PostHogProvider` and `PostHogErrorBoundary` in `posthog-config.tsx`), and it is what new code should use – `features/Probe/index.tsx` and `features/DataCollection/index.tsx` are examples. A handful of files import the same-named hook from `posthog-js/react` instead: `workspace/Alerts/index.tsx`, `features/Rotary/Toggle.tsx` and `features/Rotary/MountingSetup.tsx`. Don't copy that form, and don't "tidy" existing capture calls into it either. To see the current split:
+
+```bash
+grep -rn "usePostHog" src/app/src --include="*.tsx" --include="*.ts"
+```
+
 Outside a component (or in a non-React module) import the client directly, as `features/Macros/index.tsx` and `features/Config/assets/SettingsMenu.ts` do:
 
 ```ts

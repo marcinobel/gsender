@@ -42,6 +42,7 @@ import evaluateAssignmentExpression from "../../lib/evaluate-assignment-expressi
 import logger from "../../lib/logger";
 import translateExpression from "../../lib/translate-expression";
 import { extractRealtimeCommands } from "../../lib/extract-realtime-commands";
+import { stripSemicolonComment } from "../../lib/strip-semicolon-comment";
 import config from "../../services/configstore";
 import monitor from "../../services/monitor";
 import taskRunner from "../../services/taskrunner";
@@ -513,13 +514,27 @@ class GrblHalController {
 				const { sent, received } = this.sender.state;
 
 				if (line[0] === "%") {
+					// Compare against the % tokens on a throwaway copy with any `;`
+					// comment removed. `line` itself must stay untouched: in a %
+					// line the parentheses and commas are JavaScript, not G-code
+					// comments, and stripping them would silently corrupt the
+					// expression (see 93a0e53fc). The feeder has stripped `;`
+					// before the same comparison since 50e63eb54; this restores
+					// parity on the sender path.
+					const token = stripSemicolonComment(line);
+
 					// %wait
-					if (line === WAIT) {
+					if (token === WAIT) {
 						log.debug(
 							`Wait for the planner to empty: line=${sent + 1}, sent=${sent}, received=${received}`,
 						);
 						this.sender.hold({ data: WAIT }); // Hold reason
 						return "G4 P0.5"; // dwell
+					}
+
+					// A `%` line carrying no expression (bare `%`, or `%` plus a comment)
+					if (token === "%") {
+						return "";
 					}
 
 					// Expression
@@ -1908,7 +1923,23 @@ class GrblHalController {
 				// respond with an ok when the dwell is complete. At that instant, there will
 				// be no queued motions, as long as no more commands were sent after the G4.
 				// This is the fastest way to do it without having to check the status reports.
-				//const dwell = '%wait ; Wait for the planner to empty';
+				//
+				// Deliberately not done on grblHAL. Verified: the dwell was active
+				// when this controller was forked from the Grbl one (4fa9480c1), and
+				// 982a4ec31 disabled it. That commit's message is, in full, "Fix for
+				// motor holding is removing the dwell"; it records no mechanism, and
+				// the diff contains no reasoning.
+				//
+				// Reconstruction, not documented fact: the most plausible mechanism is
+				// that grblHAL can de-energize steppers per axis ($37, which Grbl has
+				// no equivalent for; both firmwares have the $1 idle delay itself), and
+				// the buffer sync a dwell forces at end of program can start that idle
+				// timer while the machine is still settling. Treat that as a guess
+				// until someone reproduces it on hardware.
+				//
+				// If the dwell is ever re-enabled it must be the bare token —
+				// `const dwell = WAIT;` — because the sender compares `%` lines
+				// against the token, not against a token plus a comment. See issue #1.
 
 				// Insert dwell for firmware < ATCI_SUPPORTED_VERSION where $392 is not acted on by firmware
 				const semver = this.runner.settings?.version?.semver ?? 0;
