@@ -42,7 +42,7 @@ Package manager is **yarn** (CI uses it; `bun.lock` is also committed but not wh
 
 ```bash
 yarn install                 # root deps
-npm run install:packages     # root + src/app deps
+yarn --cwd src/app install   # renderer deps (`npm run install:packages` is broken – see below)
 
 npm run dev                  # server-only dev: esbuild watch + nodemon server on :8000 + tailwind watch
 npm run electron:hot         # full desktop dev: above + vite on :5173 + electron pointed at it
@@ -52,11 +52,9 @@ npm run build                # = build-prod: css + esbuild server/main/cli + vit
 npm run build:macos          # electron-builder packaging (also :windows, :linux, and per-arch variants)
 
 npm test                     # jest, all suites
-npx jest path/to/file.test.tsx          # single file
-npx jest -t "name of the test"          # single test by name
 npm run test:unit:watch      # jest --watch
 
-npm run eslint               # eslint (see gotchas – `npm run lint` is broken)
+npm run eslint               # eslint – `npm run lint` is broken, and this one has caveats (see below)
 npm run cypress:open         # e2e against a running app; needs real hardware for most specs
 ```
 
@@ -70,10 +68,12 @@ To launch a production build from this checkout it must be `electron dist/gsende
 
 ### Known-broken scripts
 
-- `npm run lint` – the `concurrently` invocation has a missing space between `--names "..."` and the first command, so eslint never runs. Use `npm run eslint` directly.
+- `npm run lint` – the `concurrently` invocation has a missing space between `--names "..."` and the first command, so eslint never runs. Use `npm run eslint`, with the caveat below.
+- `npm run eslint` – expands to `eslint --ext .js --ext .jsx *.js scripts test --fix`. There is **no `test/` directory** in this repo, so eslint fails on the missing path, and `--fix` **rewrites your files**. Call eslint on a real path yourself (`npx eslint scripts`) if you want neither.
+- `npm run install:packages` – `yarn install && yarn install --prefix /src/app`. The leading slash makes `/src/app` an **absolute** path; the renderer is at `src/app`. Use `yarn --cwd src/app install`.
 - `yarn test:app` – invokes `../../node_modules/.bin/jest.cmd`, which exists only on Windows. Fails on macOS/Linux; use the root `npm test`.
-- The Cypress `report:*` and `*:open` scripts are `cmd.exe` syntax (`if exist`, `rmdir /s /q`, `start`) and are likewise Windows-only.
-- `npm run check-types` – points at `./src/app/src`, but the tsconfig lives at `./src/app`. Also, the only TypeScript in `node_modules` is a transitive **3.9.10**, which cannot parse this tsconfig (`moduleResolution: Bundler`, `noUncheckedIndexedAccess`, …). **There is no working typecheck in this repo** – Vite/esbuild strip types without checking them, so type errors surface only at runtime. Don't claim "types check out" without installing a modern TypeScript yourself. This is not hypothetical: the first defect this fork patches was a wizard whose action objects were never typed against the `WizardAction` interface the renderer reads, so a shipped feature could not work at all. See [FORK.md](FORK.md).
+- Three Cypress scripts are `cmd.exe`-only: `report:clean` (`if exist`, `rmdir /s /q`), `report:open` and `dashboard:open` (`start`). `report:merge`, `report:generate` and `cypress:open` are cross-platform. `npm run testgrblhal` and `npm run test:report` both open with `report:clean`, so on macOS/Linux they stop at their first step.
+- `npm run check-types` – points at `./src/app/src`, but the tsconfig lives at `./src/app`. Also, the only TypeScript in `node_modules` is a transitive **3.9.10**, which cannot parse this tsconfig (`moduleResolution: Bundler`, `noUncheckedIndexedAccess`, …). **There is no working typecheck in this repo** – Vite/esbuild strip types without checking them, so type errors surface only at runtime. Don't claim "types check out" without installing a modern TypeScript yourself. This is not hypothetical: a wizard's action objects were never typed against the `WizardAction` interface the renderer reads, so a shipped feature could not work at all. See [FORK.md](FORK.md).
 
 ## Architecture
 
@@ -81,7 +81,7 @@ To launch a production build from this checkout it must be `electron dist/gsende
 
 ```
 React component
-  → app/lib/controller.ts        (singleton socket.io client, ~120 named events)
+  → app/lib/controller.ts        (singleton socket.io client, 76 named events)
   → socket 'command' / 'write'
   → src/server/services/cncengine/CNCEngine.js   (socket ↔ controller registry, per-port)
   → GrblController / GrblHalController .command(cmd, ...args)   (big handler map: 'gcode:start', 'gcode:pause', 'homing', …)
@@ -96,7 +96,7 @@ Key server pieces in `src/server/lib/`:
 - `Workflow.js` – `idle | running | paused` state machine.
 - `ToolChanger.js`, `homing.js`, `rotary.js` – higher-level macro sequences.
 
-**Grbl and grblHAL are two near-parallel implementations** (`src/server/controllers/Grbl/` ≈2.4k lines, `Grblhal/` ≈2.9k lines) with their own parsers, constants, and controller classes. A change to firmware behaviour usually needs applying in **both**, and the grblHAL one additionally handles SD card, ATC, alarm/error detail codes, and settings descriptions.
+**Grbl and grblHAL are two near-parallel implementations** – `src/server/controllers/Grbl/GrblController.js` is 2,463 lines and `Grblhal/GrblHalController.js` is 2,957, and that is only the controller class in each directory, which also carries its own line parsers, runner and constants. A change to firmware behaviour usually needs applying in **both**, and the grblHAL one additionally handles SD card, ATC, alarm/error detail codes, and settings descriptions.
 
 ### Renderer structure (`src/app/src/`)
 
@@ -112,25 +112,34 @@ Key server pieces in `src/server/lib/`:
 
 ### Path aliases
 
-`app/*` and `@/*` → `src/app/src/*`; `app-root/*` → repo root. Configured three times over and they must stay in sync: `src/app/tsconfig.json` (for the IDE and vite-tsconfig-paths), `src/app/vite.config.js` (`resolve.alias`), and `jest.config.js` (`moduleNameMapper`). Server-side bundling resolves bare `server/`, `app/`, `electron-app/` prefixes via a custom esbuild plugin in `esbuild.config.js`.
+Four aliases exist and **no two config files declare the same set** – check this before adding one:
+
+| Alias | `src/app/tsconfig.json` | `src/app/vite.config.js` | `jest.config.js` | Target |
+|---|---|---|---|---|
+| `app/*` | yes | yes | yes | `src/app/src/*` |
+| `@/*` | **no** | yes | yes | `src/app/src/*` |
+| `app-root/*` | yes | **no** | yes | repo root in jest; in the tsconfig the mapping is `./*` against `baseUrl: "."`, so for `tsc` it means `src/app/*` |
+| `server/*` | **no** | **no** | yes | `src/server/*` |
+
+`vite.config.js` also loads `vite-tsconfig-paths`, so whatever the tsconfig declares resolves under vite as well – that is how `app-root/*` works there without being in `resolve.alias`. The reverse does not hold: `@/*` is a vite alias and a jest `moduleNameMapper` entry only, so `tsc` and anything driven by the tsconfig cannot see it. `server/*` is jest-only, added for the controller tests; the server build instead resolves bare `server/`, `app/` and `electron-app/` prefixes through a custom esbuild plugin in `esbuild.config.js`. Adding an alias means editing every file it has to work in.
 
 ## Conventions
 
 - **Server code is JavaScript, renderer code is TypeScript.** `src/server` is excluded from prettier (`.prettierignore`) and uses tabs/different style – match the file you're in rather than reformatting.
 - Every source file carries the GPLv3 header block. Keep it on new files.
-- UI is Tailwind + Radix primitives wrapped in `components/shadcn/`; prefer composing existing `components/` over new one-off styling.
+- UI is Tailwind + Radix primitives wrapped in `components/shadcn/`.
 - Socket event names are string literals duplicated between `controller.ts`'s `ControllerListeners` interface and the server emitters. Adding an event means editing both `listeners` and `ControllerListeners`.
 - Conventional Commits. CI (`.github/workflows/CI.yml`) builds packages on `master`, `dev`, `features/*`, `bugfix/*` and on tags; it runs `yarn lint` (which, per above, currently only runs stylint) but **not** the jest suite – `test.yml` only fires on PRs into `test/ci-validation`. Run `npm test` locally.
 
 ## Testing
 
-- **Jest** (`jest.config.js`, jsdom): 11 suites / 97 tests (3 skipped) covering `src/server/lib/__tests__/`, both controllers (`src/server/controllers/*/__tests__/`, added by this fork – they construct a real controller against a fake connection and need the logger mocked), a few feature computations (Surfacing output, XY squaring, movement tuning) and component smoke tests. Fast – run it. Details and mocking patterns: `src/app/docs/testing.md`.
+- **Jest** (`jest.config.js`, jsdom): ~100 tests across ~11 suites, covering `src/server/lib/__tests__/`, both controllers (`src/server/controllers/*/__tests__/` – these construct a real controller against a fake connection and need the logger mocked), a few feature computations (Surfacing output, XY squaring, movement tuning) and component smoke tests. Fast – run it. Details and mocking patterns: `src/app/docs/testing.md`.
 - **Cypress** (`cypress/e2e/grbl/`, `cypress/e2e/grblHal/`): drives the real UI at `http://localhost:8000` and expects an actual connected machine for most specs, so it does not run in CI or in a normal dev loop. Note `specPattern` in `cypress.config.js` is pinned to a single grblHAL master spec – pass `--spec` to run anything else. Details: `cypress/TESTING.md`.
 
 ## Further documentation
 
-- `FORK.md` – why this fork exists, the two defects it patches, how each was verified (the wizard fix on real hardware, the `%wait` fix by tests only so far), and the rebase posture.
-- `fork/known-issues.md` – defects and behavioural traps verified in this codebase. Two are genuine hazards: `Resume Cutting` restarts the spindle unconditionally, and a `%` expression in a G-code file can execute arbitrary JavaScript. One entry – the `%wait` planner drain, which made "job complete" not mean "machine stopped" – is fixed on this fork.
+- `FORK.md` – why this fork exists, the two defects it patches, how each was verified, and the rebase posture.
+- `fork/known-issues.md` – defects and behavioural traps verified in this codebase. Two are tagged as hazards: `Resume Cutting` restarts the spindle unconditionally, and a `%` expression in a G-code file can execute arbitrary JavaScript.
 - `fork/running-from-source.md` – building, the two silent Electron entry-point traps, where settings actually live, and the CLI options.
 - `src/app/docs/testing.md` – frontend unit testing: how to run, where tests live, mocking the controller singleton and app hooks.
 - `src/app/docs/analytics.md` – PostHog wiring, the consent gate, and the convention for adding an event.
@@ -142,6 +151,6 @@ Key server pieces in `src/server/lib/`:
 - `jest-haste-map` warns about a naming collision between `package.json` and `src/package.json` (both named `gSender`). Harmless, expected output.
 - The generated `src/package.json` and `src/app/package.json` are committed but overwritten by `package-sync`; edit the root one.
 - `.env.dev` / `.env.prod` are loaded by `esbuild.config.js` (Sentry, PostHog). See `.env.example`.
-- **Wizard actions must be declared as `{ label, gcodeLines }`.** `features/Helper/components/Actions.tsx` reads `action.gcodeLines` and nothing ever invokes a `cb` callback – a wizard action declared with `cb` renders, clicks, and sends nothing, hanging on `Running…` for ever. This is the first of the two bugs this fork patches; the objects are not typed, so nothing warns you.
+- **Wizard actions must be declared as `{ label, gcodeLines }`.** `features/Helper/components/Actions.tsx` reads `action.gcodeLines` and nothing ever invokes a `cb` callback – a wizard action declared with `cb` renders, clicks, and sends nothing, hanging on `Running…` for ever. The objects are not typed, so nothing warns you.
 - **Never mutate `line` on the `%` path.** In both controllers' sender `dataFilter` a line starting with `%` is JavaScript, not G-code – `(…)` is a function call and `,` is a sequence operator – so the comment regexes would silently corrupt it. That is what the `if (line[0] !== "%")` guard exists for. Compare against the `%` tokens using `stripSemicolonComment(line)`, a throwaway copy, and hand the evaluator the original line.
-- **Grbl and grblHAL have drifted apart in `gcode:load`.** The Grbl controller appends a `%wait` dwell to every program (`GrblController.js:1630`); grblHAL appends none, deliberately (`GrblHalController.js:1922-1942` records why). The Grbl dwell was inert from `93a0e53fc` until this fork fixed it – see `fork/known-issues.md` item 2.
+- **Grbl and grblHAL have drifted apart in `gcode:load`.** The Grbl controller appends a `%wait` dwell to every program (`GrblController.js:1630`); grblHAL appends none, deliberately (`GrblHalController.js:1922-1942` records why). See `fork/known-issues.md` item 2.

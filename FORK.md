@@ -13,7 +13,7 @@ Nothing here goes back upstream. That is a settled decision, stated at the top o
 |---|---|
 | Fork point | `c5fb9b7` (`Semver`) on `Sienci-Labs/gsender` master – version **1.6.4** |
 | Fix 1 – tool-change wizard | `82ec1fe9` on `fix/flexible-rezero-wizard-never-sends-gcode` – **one file**, +34 −39 in `src/app/src/wizards/semiautoToolchange.tsx`. Field-verified on a Two Trees TTC450 Ultra, GRBL 1.1 fork, macOS, 2026-08-04 |
-| Fix 2 – `%wait` planner drain | `fix/1-wait-planner-drain-never-fires-appended-dwell-line` – both controllers plus a new `src/server/lib/` helper, with the repo's first server-side controller tests. **Hardware verification pending** |
+| Fix 2 – `%wait` planner drain | `d70fc5a5` on `fix/1-wait-planner-drain-never-fires-appended-dwell-line` – both controllers plus a new `src/server/lib/` helper, with the repo's first server-side controller tests. **Hardware verification pending** |
 | Also on the branches | `c0c605a6` docs sync, `d9bc425f` the no-upstream guard – neither is part of either fix |
 
 ## Fix 1 – the tool-change wizard never sends its probe G-code
@@ -180,9 +180,10 @@ added `moduleNameMapper` line.
 ## Further reading
 
 - [fork/known-issues.md](fork/known-issues.md) – seventeen defects and behavioural traps verified in
-  this codebase while fixing the above. One of them (the `%wait` planner drain) is patched here; the
-  rest are not. Two are genuine hazards – `Resume Cutting` restarts the spindle unconditionally, and
-  a G-code file can execute arbitrary JavaScript
+  this codebase while fixing the above. One of them (the `%wait` planner drain, item 2) is patched
+  here; the rest are not. Two carry a **hazard** tag – item 1, `Resume Cutting` restarts the spindle
+  unconditionally, and item 11, a G-code file can execute arbitrary JavaScript – and those two plus
+  item 2 are the three that change what you should do at the machine
 - [fork/running-from-source.md](fork/running-from-source.md) – building, the two silent Electron
   entry-point traps, and where settings actually live
 - [CLAUDE.md](CLAUDE.md) – the no-upstream rule and how it is enforced

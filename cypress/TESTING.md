@@ -6,7 +6,7 @@ This project uses **Cypress** to run **end-to-end UI tests** against the gSender
 
 The Cypress tests are mainly focused on CNC workflow coverage through the UI for both GRBL and grblHAL.
 
-**These tests need real hardware.** Most specs drive an actual connection to a CNC controller, so they are not part of a normal dev loop and they do **not** run in CI – `.github/workflows/CI.yml` runs lint and the packaging build only. For the fast, hardware-free suite see Jest (`npm test`, and `src/app/docs/testing.md`).
+**These tests need real hardware.** Most specs drive an actual connection to a CNC controller, so they are not part of a normal dev loop and they do **not** run in CI – `.github/workflows/CI.yml` runs lint and the packaging build only. The repo's other workflow, `.github/workflows/test.yml`, runs `yarn test` (Jest) and fires only on pull requests into the `test/ci-validation` branch, so nothing runs Cypress automatically anywhere. For the fast, hardware-free suite see Jest (`npm test`, and `src/app/docs/testing.md`).
 
 ## What this covers
 
@@ -14,6 +14,8 @@ The specs are organized under:
 
 - `cypress/e2e/grbl/*` (GRBL flows)
 - `cypress/e2e/grblHal/*` (grblHAL flows)
+
+The split is not reliable: `gotolocationgrblHal.cy.js` and `grblhaljobrun.cy.js` both sit under `cypress/e2e/grbl/` despite their names. `grblhaljobrun.cy.js` is titled `GrblHal File upload and job run`, while `gotolocationgrblHal.cy.js` is titled `CNC Machine Tests Grbl` and calls the GRBL `cy.connectMachine()`. Read the spec body, not the path or the filename.
 
 Overall, the suite covers:
 
@@ -63,7 +65,8 @@ It also globally ignores one known uncaught exception – errors containing `add
 - Console helpers: `cy.sendConsoleCommand(...)`, `cy.clearConsole()`, `cy.verifyConsoleContains(...)`
 - Verification helpers: `cy.verifyMachineStatus(...)`, `cy.verifyAxes(x, y, z)` (tolerance-based), `cy.checkProbingIsActive(...)`, `cy.waitUntilIdle()`
 - Job helpers: `cy.stopJobAndGetDetails()` (extracts status/time/errors from the Job End popup)
-- Navigation and settings: `cy.goToCarve()`, `cy.goToStats()`, `cy.searchInSettings(...)`, `cy.applySettings(...)`
+- Navigation and settings: `cy.goToCarve()`, `cy.goToStats()`, `cy.goToTools()` (`commands.js:1083`), `cy.goToConfig()` (`commands.js:1087`), `cy.searchInSettings(...)`, `cy.applySettings(...)`
+- Input: `cy.forceInput(selector, value)` (`commands.js:606`) – clears, types and blurs with `{ force: true }`, then asserts the field holds the value
 
 Two names – `loadUI` and `verifyMachineStatus` – are registered more than once in this file. Cypress keeps the **last** registration, so read the bottom-most definition when debugging behaviour that does not match the first one you find.
 
@@ -91,7 +94,7 @@ The committed template is `cypress.envexample.json` at the repo root. Copy it to
 | `grblhal_port` | Port of your grblHAL machine, used for connecting |
 | `file` | Path to the G-code file the specs load |
 | `X+Y+`, `X-Y-`, `X+Y-`, `X-Y+` | Diagonal jog shortcut keys, in Cypress key syntax (for example `{alt}{leftArrow}`) |
-| `devicePrefix` | Used by `cypress/e2e/grblHal/unlock_machine.spec.grblhal.cy.js`; defaults to `COM`. Set it to the prefix your port labels share in the connection dialog (for example `COM` on Windows, `tty` on macOS/Linux) |
+| `devicePrefix` | **Not in the template – add it by hand.** Used by `cypress/e2e/grblHal/unlock_machine.spec.grblhal.cy.js`, which falls back to `COM` when it is missing. Set it to the prefix your port labels share in the connection dialog (for example `COM` on Windows, `tty` on macOS/Linux) |
 
 ## How to run
 
@@ -102,9 +105,9 @@ Interactive:
 3. `npm run cypress:open`
 4. Select E2E, pick a browser, then pick a spec – remembering the `specPattern` restriction above.
 
-Headless, with the full grblHAL report pipeline: `npm run testgrblhal`.
+Headless, with the full grblHAL report pipeline: `npm run testgrblhal` – **Windows only**. It opens with `report:clean` and closes with `dashboard:open`, both `cmd.exe` syntax, so on macOS or Linux it stops at the first step.
 
-**The report scripts are Windows-only.** `report:clean` uses `cmd.exe` syntax (`if exist`, `rmdir /s /q`), and `report:open` / `dashboard:open` use `start`. On macOS or Linux, run Cypress directly and then `npm run report:merge && npm run report:generate && npm run dashboard:generate`, opening the HTML yourself.
+**Three of the report scripts are Windows-only.** `report:clean` uses `cmd.exe` syntax (`if exist`, `rmdir /s /q`), and `report:open` / `dashboard:open` use `start`. `report:merge` and `report:generate` run anywhere. On macOS or Linux, run Cypress directly and then `npm run report:merge && npm run report:generate && npm run dashboard:generate`, opening the HTML yourself.
 
 ### What success looks like
 
