@@ -17,6 +17,14 @@ The specs are organized under:
 
 The split is not reliable: `gotolocationgrblHal.cy.js` and `grblhaljobrun.cy.js` both sit under `cypress/e2e/grbl/` despite their names. `grblhaljobrun.cy.js` is titled `GrblHal File upload and job run`, while `gotolocationgrblHal.cy.js` is titled `CNC Machine Tests Grbl` and calls the GRBL `cy.connectMachine()`. Read the spec body, not the path or the filename.
 
+**The window-title assertions are stale and will fail.** Three places pin the exact title to `gSender 1.6.0`:
+
+- `cypress/support/commands.js:41` – the `expectedTitle` default in `cy.loadUI`
+- `cypress/e2e/grbl/loadUI_grbl.cy.js:13`
+- `cypress/e2e/grblHal/loadUI_grblHal.cy.js:13`
+
+They were already wrong before this fork touched anything – the repo is at 1.6.4. On a fork build they are wrong twice over, because the title also carries the fork marker (`gSender 1.6.4 (Marcin Obel)`, see [FORK.md](../FORK.md)). Pinning a version string in a test guarantees this; asserting a prefix, or reading the version from `package.json`, would not. Left unfixed – these specs need a real machine to run at all, so nothing exercises them in a normal dev loop.
+
 Overall, the suite covers:
 
 - UI load/reload robustness

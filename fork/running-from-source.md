@@ -19,7 +19,23 @@ npm run build-prod          # needs yarn on PATH; ~2 min
 |---|---|
 | `electron .` | the root `package.json` says `main: ./dist/gsender/server-cli` – the **headless server**. It starts, and there is no window and no error |
 | `electron dist/gsender/main.js` | right entry point, but handing Electron a **`.js` file** means it never reads a `package.json`, so the app name stays `Electron` and its state goes to `~/Library/Application Support/Electron/`. gSender boots with **factory defaults** – no `toolChangeOption`, no probe settings, no shortcuts |
-| `electron dist/gsender` **← correct** | reads `dist/gsender/package.json`, which names the app `gSender`, so state resolves to the shared `Application Support/gSender` folder |
+| `electron dist/gsender` **← the right form, but see below** | reads `dist/gsender/package.json`, which names the app `gSender`, so state resolves to the shared `Application Support/gSender` folder. **On a fresh `npm run build` this still does not launch** – that manifest has no `main`, so Electron looks for `index.js`, finds none, and shows an error dialog. The process stays alive, so it looks like it started |
+
+**Straight after `npm run build` you must add the `main` field yourself**, exactly as electron-builder
+would. Verified 2026-08-05: without it the server never boots; with it the app starts normally.
+
+```bash
+node -e "const f='dist/gsender/package.json',j=require('./'+f);j.main='./main.js';\
+require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
+npx electron dist/gsender
+```
+
+`dist/` is a build artifact, so this has to be re-applied after every rebuild. If you want a build
+that launches without the extra step, package it (`npm run build:macos`) – electron-builder injects
+`main` for you.
+
+Note the server binds an **ephemeral port** under Electron, not `8000` (see the CLI defaults below),
+so read the port from the startup log rather than assuming.
 
 The packaged app never hits either trap because the manifest copied into `dist/gsender/` carries the
 right `name` but, **as built, no `main` field** – electron-builder injects that at packaging time via

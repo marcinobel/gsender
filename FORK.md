@@ -1,10 +1,11 @@
 # This fork
 
 A private fork of [Sienci-Labs/gsender](https://github.com/Sienci-Labs/gsender) carrying two
-behavioural fixes. It exists because **stock gSender cannot complete a tool change** on a machine
-that needs the `Flexible Re-zero` strategy – the wizard never sends its probe G-code. The second fix
-came out of the first: gSender's end-of-job planner drain had stopped working on Grbl, so "job
-complete" could be reported while the machine was still moving.
+behavioural fixes, plus a cosmetic fork marker in the window title. It exists because **stock gSender
+cannot complete a tool change** on a machine that needs the `Flexible Re-zero` strategy – the wizard
+never sends its probe G-code. The second fix came out of the first: gSender's end-of-job planner
+drain had stopped working on Grbl, so "job complete" could be reported while the machine was still
+moving.
 
 Nothing here goes back upstream. That is a settled decision, stated at the top of
 [CLAUDE.md](CLAUDE.md) and enforced by a `PreToolUse` hook.
@@ -179,6 +180,29 @@ the files upstream churns most. The comparison logic itself lives in a new file 
 `src/server/lib/`, which is a conflict-free add, so what has to be re-applied by hand is one import
 and one changed comparison per controller. The new tests are add-only; `jest.config.js` carries one
 added `moduleNameMapper` line.
+
+Two further lines are easy to lose in a rebase because they are one-line edits in files upstream
+touches often – the **fork marker** (below). Check for them explicitly after any rebase; nothing
+fails if they go missing, the build just stops identifying itself.
+
+## Fork marker
+
+The window title reads `gSender <version> (Marcin Obel)` so a fork build is distinguishable from
+stock gSender at a glance. Two one-line edits:
+
+| File | Role |
+|---|---|
+| `src/app/src/workspace/index.tsx` | sets `document.title`; the authoritative writer, re-applied on every route change |
+| `src/main.js` | the `BrowserWindow` `title` option – covers the moment before React mounts, and the Dock-reactivate path |
+
+**Display only, deliberately.** The marker must never go into `build.productName` (root
+`package.json`) or the `name` in `src/app/package.json`. Those derive `app.getName()` and therefore
+`app.getPath('userData')` – changing either moves the settings directory, and the app boots with
+factory defaults: no probe settings, no shortcuts, no machine profiles. That is the same failure
+described in [fork/running-from-source.md](fork/running-from-source.md).
+
+Known consequence: three Cypress assertions pin the exact window title and are now wrong on two
+counts – see [cypress/TESTING.md](cypress/TESTING.md). They were already stale before the marker.
 
 ## Further reading
 

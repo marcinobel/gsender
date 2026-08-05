@@ -122,6 +122,7 @@ You can both run gSender locally using the public code-base as well as compile i
 - A `%wait` line in your own file is now recognised on both grbl and grblHAL, with or without a comment after it, and sending pauses there until queued motion has finished.
 - No change to end-of-job behaviour on grblHAL, which does not add a planner drain of its own.
 - Loading a file no longer logs a parse error for that drain line, and a `%` line containing nothing but a comment is no longer treated as an expression.
+- The window title now reads `gSender 1.6.4 (Marcin Obel)`, so a build from this fork is distinguishable from an official release at a glance. Settings, profiles and shortcuts are unaffected — the change is to the displayed title only, not to how the app identifies itself on disk.
 
 ### 1.6.3 (July 23, 2026)
 - Added LongMill MK3 profiles.

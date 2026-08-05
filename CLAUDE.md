@@ -60,7 +60,9 @@ npm run cypress:open         # e2e against a running app; needs real hardware fo
 
 Dev vs prod output dirs differ: dev builds go to `output/`, production builds to `dist/gsender/`. `npm run clean` wipes both.
 
-To launch a production build from this checkout it must be `electron dist/gsender` – the **directory**. `electron .` starts the headless server (the root `main` is `./dist/gsender/server-cli`) and `electron dist/gsender/main.js` boots with factory-default settings under a different app identity. Both fail silently. Details and the config-store consequences: [fork/running-from-source.md](fork/running-from-source.md).
+To launch a production build from this checkout it must be `electron dist/gsender` – the **directory**. `electron .` starts the headless server (the root `main` is `./dist/gsender/server-cli`) and `electron dist/gsender/main.js` boots with factory-default settings under a different app identity. Both fail silently. **A fresh `npm run build` will not launch even with the directory form**: the generated `dist/gsender/package.json` has no `main`, so Electron looks for `index.js` and shows an error dialog while staying alive. Add `"main": "./main.js"` to that file first (electron-builder does it during packaging, `npm run build` does not). Under Electron the server binds an ephemeral port, not `8000`. Details and the config-store consequences: [fork/running-from-source.md](fork/running-from-source.md).
+
+The window title carries a fork marker – `gSender <version> (Marcin Obel)` – set in `src/app/src/workspace/index.tsx` and `src/main.js`. It is **display only**. Never put the marker in `build.productName` or `src/app/package.json`'s `name`: those derive `app.getPath('userData')`, so changing them moves the settings directory and the app boots factory-default.
 
 `prebuild-*` runs `scripts/package-sync.js`, which regenerates `src/package.json` (the manifest that ships inside the Electron bundle) and `src/app/package.json` from the root `package.json`. Bump versions in the **root** `package.json`; the others are generated.
 
