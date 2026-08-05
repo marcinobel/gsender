@@ -8,9 +8,9 @@
 > Do not treat anything below as a description of the code. Review rounds changed the plan in
 > several places, listed immediately below.
 
-Target: `marcinobel/gsender` (private fork). Shipped on branch
-`fix/1-wait-planner-drain-never-fires-appended-dwell-line` (this document's original
-`bugfix/wait-planner-drain` was never used).
+Target: `marcinobel/gsender` (private fork). Shipped as `d70fc5a5`, merged to `master` in `db7f545c`
+(PR #3); the branch it was written on has since been deleted, and this document's originally proposed
+`bugfix/wait-planner-drain` was never used.
 
 > **Corrections, added after implementation.** Four things below are stale:
 >
@@ -638,10 +638,13 @@ Three levels, cheapest first:
    drain stops happening, everything else stays correct. One line.
 2. **Revert the controller hunks:** `git revert` the commit's changes to the two controllers. The
    helper and tests can stay (the helper becomes unused — remove or leave).
-3. **Full revert:** single commit on `bugfix/wait-planner-drain`, `git revert` it.
+3. **Full revert:** the code landed as `d70fc5a5`, merged to master in `db7f545c` (PR #3). Revert the
+   code commit alone with `git revert d70fc5a5`; the docs and generated-artifact commits on that PR
+   (`095d0181`, `8e169b22`, `4447a1c5`) are independent of it. Reverting the whole merge with
+   `git revert -m 1 db7f545c` also undoes those.
 
-Because the change is one commit on a branch off `master` with no schema, settings, or protocol
-implications, rollback is a pure code revert with no migration.
+There are no schema, settings, or protocol implications, so rollback is a pure code revert with no
+migration.
 
 ---
 

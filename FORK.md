@@ -12,9 +12,11 @@ Nothing here goes back upstream. That is a settled decision, stated at the top o
 | | |
 |---|---|
 | Fork point | `c5fb9b7` (`Semver`) on `Sienci-Labs/gsender` master – version **1.6.4** |
-| Fix 1 – tool-change wizard | `82ec1fe9` on `fix/flexible-rezero-wizard-never-sends-gcode` – **one file**, +34 −39 in `src/app/src/wizards/semiautoToolchange.tsx`. Field-verified on a Two Trees TTC450 Ultra, GRBL 1.1 fork, macOS, 2026-08-04 |
-| Fix 2 – `%wait` planner drain | `d70fc5a5` on `fix/1-wait-planner-drain-never-fires-appended-dwell-line` – both controllers plus a new `src/server/lib/` helper, with the repo's first server-side controller tests. **Hardware verification pending** |
-| Also on the branches | `c0c605a6` docs sync, `d9bc425f` the no-upstream guard – neither is part of either fix |
+| Fix 1 – tool-change wizard | `82ec1fe9`, merged to master as `244906b8` (PR #2) – **one file**, +34 −39 in `src/app/src/wizards/semiautoToolchange.tsx`. Field-verified on a Two Trees TTC450 Ultra, GRBL 1.1 fork, macOS, 2026-08-04 |
+| Fix 2 – `%wait` planner drain | `d70fc5a5`, merged to master as `db7f545c` (PR #3) – both controllers plus a new `src/server/lib/` helper, with the repo's first server-side controller tests. **Hardware verification pending**, tracked as issue #1 |
+| Also on master | `c0c605a6` docs sync, `d9bc425f` the no-upstream guard – neither is part of either fix |
+
+Both fix branches were deleted after merging. Everything this fork carries is on `master`.
 
 ## Fix 1 – the tool-change wizard never sends its probe G-code
 
@@ -165,7 +167,8 @@ before trusting it mid-project:
 
 ## Rebase posture
 
-**Upstream master had no commits after the fork point** as of 2026-08-04.
+**Upstream master had no commits after the fork point** as of 2026-08-05 – `Sienci-Labs/gsender`
+master is still `c5fb9b7` itself.
 
 More usefully, neither patch diverges from what the code already claims to do. Fix 1 restores the
 renderer's own declared contract; fix 2 makes the sender recognise the line the controller was
